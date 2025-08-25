@@ -23,11 +23,11 @@
 
 ## Development Environment
 ### [Flutter](https://docs.flutter.cn/get-started/install)
-- flutter stable 3.29.3
-- dart 3.7.2
+- flutter stable 3.35.1
+- dart 3.9.0
 - gradle 8.12
-- gradle-plugin 8.7.3
-- kotlin 1.8.22
+- gradle-plugin 8.9.1
+- kotlin 2.1.0
 
 ### Build Commands
 - Install flutter_distributor
