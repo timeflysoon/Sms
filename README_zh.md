@@ -33,11 +33,11 @@
 
 ## 构建与发布
 
-使用 flutter_distributor 打包 release：
+使用 fastforge 打包 release：
 
 ```bash
-dart pub global activate flutter_distributor
-flutter_distributor release --name apk
+dart pub global activate fastforge
+fastforge release --name apk
 ```
 
 产物输出到 `dist/` 目录。APK 使用 release 签名，且仅打包 **arm64-v8a** 单 ABI。

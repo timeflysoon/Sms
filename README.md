@@ -33,11 +33,11 @@
 
 ## Build & Publish
 
-Build the release APK with flutter_distributor:
+Build the release APK with fastforge:
 
 ```bash
-dart pub global activate flutter_distributor
-flutter_distributor release --name apk
+dart pub global activate fastforge
+fastforge release --name apk
 ```
 
 Artifacts are output to `dist/`. The APK is signed with the release keystore and packages **arm64-v8a only** (single ABI).
