@@ -23,12 +23,12 @@
 
 ## 開發環境
 
-- Flutter 3.44.9 (stable)
-- Dart 3.12.2
-- Gradle 9.1.0
-- Android Gradle Plugin 9.0.1
-- Kotlin 2.3.20
-- compileSdk 36 / minSdk 26
+- Flutter 3.47.2 (stable)
+- Dart 3.13.2
+- Gradle 9.3.1
+- Android Gradle Plugin 9.1.0
+- Kotlin 2.4.10
+- compileSdk 37 / minSdk 26
 - JDK 17
 
 ## 構建與發佈
@@ -46,9 +46,9 @@ flutter_distributor release --name apk
 
 | 工作流 | 觸發時機 | Flutter 渠道 | 內容 |
 | --- | --- | --- | --- |
-| `build.yml` | push main（版本 tag 除外）/ 新建 PR | stable | `dart analyze` + 構建 APK + 上傳 artifact |
-| `manual.yml` | 手動觸發 | beta / master / stable 可選 | `dart analyze` + 構建 APK + 上傳 artifact |
-| `publish.yml` | 版本 tag（如 `1.6.1+250725`） | beta | 構建 APK + 建立草稿 Release |
+| `build.yml` | push main（版本 tag 除外）/ 新建 PR | stable | `dart analyze` + `flutter test` + 構建 APK + 上傳 artifact |
+| `manual.yml` | 手動觸發 | beta / master / stable 可選（預設 stable） | `dart analyze` + `flutter test` + 構建 APK + 上傳 artifact |
+| `publish.yml` | 版本 tag（如 `1.6.1+250725`） | stable | 構建 APK + 建立草稿 Release |
 
 ### 構建注意事項
 
@@ -57,7 +57,8 @@ flutter_distributor release --name apk
 - lint 相關任務在 `android/build.gradle.kts` 中被跳過：舊外掛的 buildscript 釘老版本 AGP，與根工程 AGP 9.1.0 混載會導致 lint worker（`AndroidLintWorkAction`）崩潰，因此統一禁用 lint 系列任務，並為 `extract*Annotations` 任務生成佔位產物。
 - `android/gradle.properties` 中設定了 `kotlin.incremental=false`：Windows 上 Kotlin 增量編譯無法處理原始碼（C: 碟 pub 快取）與構建產物（D: 碟工程）跨磁碟的情況。
 - `sms_advanced` 外掛自身應用了 Kotlin Gradle Plugin，未來版本 Flutter 將拒絕構建，需留意替代方案。
-- 程式碼品質由 CI 中的 `dart analyze` 保證。
+- 程式碼品質由 CI 中的 `dart analyze` + `flutter test` 保證。
+- 本地執行測試：`flutter test`（平台通道已 mock，無需真機）。
 
 ## 專案結構
 

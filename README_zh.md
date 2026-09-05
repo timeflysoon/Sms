@@ -23,12 +23,12 @@
 
 ## 开发环境
 
-- Flutter 3.44.9 (stable)
-- Dart 3.12.2
-- Gradle 9.1.0
-- Android Gradle Plugin 9.0.1
-- Kotlin 2.3.20
-- compileSdk 36 / minSdk 26
+- Flutter 3.47.2 (stable)
+- Dart 3.13.2
+- Gradle 9.3.1
+- Android Gradle Plugin 9.1.0
+- Kotlin 2.4.10
+- compileSdk 37 / minSdk 26
 - JDK 17
 
 ## 构建与发布
@@ -46,9 +46,9 @@ flutter_distributor release --name apk
 
 | 工作流 | 触发时机 | Flutter 渠道 | 内容 |
 | --- | --- | --- | --- |
-| `build.yml` | push main（版本 tag 除外）/ 新建 PR | stable | `dart analyze` + 构建 APK + 上传 artifact |
-| `manual.yml` | 手动触发 | beta / master / stable 可选 | `dart analyze` + 构建 APK + 上传 artifact |
-| `publish.yml` | 版本 tag（如 `1.6.1+250725`） | beta | 构建 APK + 创建草稿 Release |
+| `build.yml` | push main（版本 tag 除外）/ 新建 PR | stable | `dart analyze` + `flutter test` + 构建 APK + 上传 artifact |
+| `manual.yml` | 手动触发 | beta / master / stable 可选（默认 stable） | `dart analyze` + `flutter test` + 构建 APK + 上传 artifact |
+| `publish.yml` | 版本 tag（如 `1.6.1+250725`） | stable | 构建 APK + 创建草稿 Release |
 
 ### 构建注意事项
 
@@ -57,7 +57,8 @@ flutter_distributor release --name apk
 - lint 相关任务在 `android/build.gradle.kts` 中被跳过：旧插件的 buildscript 钉老版本 AGP，与根工程 AGP 9.1.0 混载会导致 lint worker（`AndroidLintWorkAction`）崩溃，因此统一禁用 lint 系列任务，并为 `extract*Annotations` 任务生成占位产物。
 - `android/gradle.properties` 中设置了 `kotlin.incremental=false`：Windows 上 Kotlin 增量编译无法处理源码（C: 盘 pub 缓存）与构建产物（D: 盘工程）跨盘符的情况。
 - `sms_advanced` 插件自身应用了 Kotlin Gradle Plugin，未来版本 Flutter 将拒绝构建，需留意替代方案。
-- 代码质量由 CI 中的 `dart analyze` 保证。
+- 代码质量由 CI 中的 `dart analyze` + `flutter test` 保证。
+- 本地运行测试：`flutter test`（平台通道已 mock，无需真机）。
 
 ## 项目结构
 
