@@ -387,16 +387,32 @@ class _SmsHomePageState extends State<SmsHomePage> {
   }
 
   Future<void> _requestPermission() async {
-    PermissionStatus status = await Permission.sms.request();
-    bool ok = (status == PermissionStatus.granted);
-    if (ok && _showList.value.isEmpty) {
-      _querySms();
+    // v13 迁移指南：Android 上 status 永不返回 permanentlyDenied，
+    // 只能以 request() 结果为准。已授权时直接跳过请求。
+    if (await Permission.sms.isGranted) {
+      if (_showList.value.isEmpty) {
+        _querySms();
+      }
+      _showToast(appLocalizations.operation_completed);
+      return;
     }
-    _showToast(
-      ok
-          ? appLocalizations.operation_completed
-          : appLocalizations.operation_failed,
-    );
+    final PermissionStatus status = await Permission.sms.request();
+    if (status.isGranted || status.isLimited) {
+      if (_showList.value.isEmpty) {
+        _querySms();
+      }
+      _showToast(appLocalizations.operation_completed);
+      return;
+    }
+    if (status.isPermanentlyDenied) {
+      // 第二次拒绝后系统不再弹窗，引导用户去设置页手动开启。
+      // 不持久化该结论：从设置返回后下次用户操作会再次 request()。
+      _showToast(appLocalizations.toast_permission);
+      await _setAppPermission();
+      return;
+    }
+    // 本次刚拒绝：不立即重弹，等下次用户操作再试。
+    _showToast(appLocalizations.operation_failed);
   }
 
   Future<void> _setAppPermission() async {

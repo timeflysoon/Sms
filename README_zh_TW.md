@@ -52,9 +52,9 @@ flutter_distributor release --name apk
 
 ### 構建注意事項
 
-- `permission_handler` 固定在 `12.0.3`：v13 要求 compileSdk 37，超出 Flutter stable 模板（compileSdk 36）與 AGP 9.0.1 的支援範圍。
-- 老外掛（如 `sms_advanced 1.1.0`，AGP 4.1 時代產物）缺少 `namespace` 且寫死 `compileSdk 31`，根 `android/build.gradle.kts` 中自動用 `project.group` 補全 namespace，並把舊庫模組的 compileSdk 抬升到 36。
-- lint 相關任務在 `android/build.gradle.kts` 中被跳過：舊外掛的 buildscript 釘老版本 AGP，與根工程 AGP 9.0.1 混載會導致 lint worker（`AndroidLintWorkAction`）崩潰，因此統一禁用 lint 系列任務，並為 `extract*Annotations` 任務生成佔位產物。
+- `permission_handler` 已升級到 `13.0.2`：v13 要求 compileSdk 37，因此 `android/app/build.gradle.kts` 硬編碼 `compileSdk = 37`（高於 Flutter 3.47 模板的 36），配合 AGP 9.1.0 + Android SDK Platform 37。權限程式碼遵循 v13 request-driven 模式（不從 `status` 推導 `permanentlyDenied`）。
+- 老外掛（如 `sms_advanced 1.1.0`，AGP 4.1 時代產物）缺少 `namespace` 且寫死 `compileSdk 31`，根 `android/build.gradle.kts` 中自動用 `project.group` 補全 namespace，並把舊庫模組的 compileSdk 抬升到 37。
+- lint 相關任務在 `android/build.gradle.kts` 中被跳過：舊外掛的 buildscript 釘老版本 AGP，與根工程 AGP 9.1.0 混載會導致 lint worker（`AndroidLintWorkAction`）崩潰，因此統一禁用 lint 系列任務，並為 `extract*Annotations` 任務生成佔位產物。
 - `android/gradle.properties` 中設定了 `kotlin.incremental=false`：Windows 上 Kotlin 增量編譯無法處理原始碼（C: 碟 pub 快取）與構建產物（D: 碟工程）跨磁碟的情況。
 - `sms_advanced` 外掛自身應用了 Kotlin Gradle Plugin，未來版本 Flutter 將拒絕構建，需留意替代方案。
 - 程式碼品質由 CI 中的 `dart analyze` 保證。

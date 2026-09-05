@@ -52,9 +52,9 @@ Artifacts are output to `dist/`. The APK is signed with the release keystore and
 
 ### Build Notes
 
-- `permission_handler` is pinned to `12.0.3`: v13 requires compileSdk 37, which exceeds the Flutter stable template (compileSdk 36) and AGP 9.0.1's supported range.
-- Old plugins (e.g. `sms_advanced 1.1.0`, from the AGP 4.1 era) lack a `namespace` and hardcode `compileSdk 31`. The root `android/build.gradle.kts` auto-fills the namespace from `project.group` and raises the compileSdk of legacy library modules to 36.
-- Lint tasks are disabled in `android/build.gradle.kts` (see the Call project note): legacy plugin buildscripts pin old AGP versions and crash the lint worker (`AndroidLintWorkAction`) when mixed with root AGP 9.0.1; `extract*Annotations` tasks are replaced with placeholder outputs.
+- `permission_handler` upgraded to `13.0.2`: v13 requires compileSdk 37, so `android/app/build.gradle.kts` pins `compileSdk = 37` (above Flutter 3.47 template 36) with AGP 9.1.0 + Android SDK Platform 37. Permission code follows the v13 request-driven pattern (never derive `permanentlyDenied` from `status`).
+- Old plugins (e.g. `sms_advanced 1.1.0`, from the AGP 4.1 era) lack a `namespace` and hardcode `compileSdk 31`. The root `android/build.gradle.kts` auto-fills the namespace from `project.group` and raises the compileSdk of legacy library modules to 37.
+- Lint tasks are disabled in `android/build.gradle.kts` (see the Call project note): legacy plugin buildscripts pin old AGP versions and crash the lint worker (`AndroidLintWorkAction`) when mixed with root AGP 9.1.0; `extract*Annotations` tasks are replaced with placeholder outputs.
 - `kotlin.incremental=false` is set in `android/gradle.properties`: on Windows, Kotlin incremental compilation cannot handle sources (pub cache on the C: drive) and build output (project on the D: drive) on different drives.
 - `sms_advanced` applies the Kotlin Gradle Plugin itself; future Flutter versions will reject this, so keep an eye out for an alternative.
 - Code quality is guaranteed by `dart analyze` in CI.

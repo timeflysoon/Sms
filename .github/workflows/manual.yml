@@ -32,6 +32,12 @@ jobs:
           channel: ${{ inputs.flutter_channel }}
           cache: true
 
+      - name: Setup Android SDK Platform 37
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.1" "build-tools;37.0.0"
+          ln -sfn "$ANDROID_HOME/platforms/android-37.1" "$ANDROID_HOME/platforms/android-37"
+        shell: bash
+
       - name: Install Dependencies
         run: flutter pub get
         shell: bash
