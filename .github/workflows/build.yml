@@ -31,22 +31,31 @@ jobs:
           cache: true
 
       - name: Setup Android SDK Platform 37
-        # compileSdk=37 需要 android-37 目录，但 sdkmanager 只提供版本化目录（如 android-37.1），故安装后做软链。
-        # yes 在 sdkmanager 退出后写 stdin 会收 SIGPIPE，在 pipefail 下导致整步失败，用 || true 忽略（安装本身不受影响）。
+        # compileSdk=37 需要 android-37 目录；sdkmanager 只提供版本化目录（如 android-37.1）。
+        # 镜像若已自带有效的 android-37 则跳过，否则取最新已安装的 37.x（排除 beta）做软链。
+        # yes 在 sdkmanager 退出后写 stdin 会收 SIGPIPE，在 pipefail 下导致整步失败，用 || true 忽略。
         run: |
-          if [ ! -d "$ANDROID_HOME/platforms/android-37.1" ]; then
-            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.1" "build-tools;37.0.0" || true
+          if [ ! -f "$ANDROID_HOME/platforms/android-37/android.jar" ]; then
+            LATEST_37=$(ls -d "$ANDROID_HOME/platforms/android-37".* 2>/dev/null | grep -v beta | sort -V | tail -n 1)
+            if [ -z "$LATEST_37" ]; then
+              yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.1" "build-tools;37.0.0" || true
+              LATEST_37="$ANDROID_HOME/platforms/android-37.1"
+            fi
+            ln -sfnT "$LATEST_37" "$ANDROID_HOME/platforms/android-37"
           fi
-          ln -sfn "$ANDROID_HOME/platforms/android-37.1" "$ANDROID_HOME/platforms/android-37"
           ls "$ANDROID_HOME/platforms"
+        shell: bash
+
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses || true
         shell: bash
 
       - name: Install Dependencies
         run: flutter pub get
         shell: bash
 
-      - name: Install flutter_distributor
-        run: dart pub global activate flutter_distributor
+      - name: Install fastforge
+        run: dart pub global activate fastforge
         shell: bash
 
       - name: Checking flutter
@@ -62,7 +71,7 @@ jobs:
         shell: bash
 
       - name: Build APK
-        run: flutter_distributor release --name apk
+        run: fastforge release --name apk
         shell: bash
 
       - name: Archive APK
