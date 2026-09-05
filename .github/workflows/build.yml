@@ -31,9 +31,14 @@ jobs:
           cache: true
 
       - name: Setup Android SDK Platform 37
+        # compileSdk=37 需要 android-37 目录，但 sdkmanager 只提供版本化目录（如 android-37.1），故安装后做软链。
+        # yes 在 sdkmanager 退出后写 stdin 会收 SIGPIPE，在 pipefail 下导致整步失败，用 || true 忽略（安装本身不受影响）。
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.1" "build-tools;37.0.0"
+          if [ ! -d "$ANDROID_HOME/platforms/android-37.1" ]; then
+            yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.1" "build-tools;37.0.0" || true
+          fi
           ln -sfn "$ANDROID_HOME/platforms/android-37.1" "$ANDROID_HOME/platforms/android-37"
+          ls "$ANDROID_HOME/platforms"
         shell: bash
 
       - name: Install Dependencies
