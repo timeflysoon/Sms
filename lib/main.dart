@@ -64,7 +64,7 @@ class SmsHomePage extends StatefulWidget {
 
 /// 列表页只负责渲染与交互呈现：业务状态与规则都在 SmsListController 里，
 /// 这里不保存短信数据、不重复实现过滤与删除逻辑。
-class _SmsHomePageState extends State<SmsHomePage> {
+class _SmsHomePageState extends State<SmsHomePage> with WidgetsBindingObserver {
   late SmsListController _controller;
   final FocusNode _focusNode = FocusNode();
   late AppLocalizations appLocalizations;
@@ -362,21 +362,26 @@ class _SmsHomePageState extends State<SmsHomePage> {
   }
 
   Future<void> _requestPermission() async {
-    // v13 迁移指南：Android 上 status 永不返回 permanentlyDenied，
-    // 只能以 request() 结果为准。已授权时直接跳过请求。
-    if (await Permission.sms.isGranted) {
-      if (_controller.isEmpty) {
-        _controller.queryAll();
-      }
+    // 勿用 Permission.sms.isGranted 短路：掉默认短信角色并被系统强停后，
+    // 该状态可能仍缓存为 true，导致「申请成功」假象，实际 READ_SMS 已被收回。
+    // 一律走 request() 让系统重新裁定；再以原生 checkSelfPermission 复核。
+    final PermissionStatus status = await Permission.sms.request();
+    final bool reallyGranted = await _controller.repository
+        .hasReadSmsPermission();
+    final bool? isDefault = await _controller.repository.isDefaultSmsApp();
+
+    if (reallyGranted || isDefault == true) {
+      // 系统侧确实可读（有 READ_SMS，或本应用仍是默认短信）。
+      // 强制重查，去掉空列表残留。
+      await _controller.queryAll();
       _showToast(appLocalizations.operation_completed);
       return;
     }
-    final PermissionStatus status = await Permission.sms.request();
+
+    // permission_handler 报成功但原生 check 为否：状态不一致，去设置页手动开。
     if (status.isGranted || status.isLimited) {
-      if (_controller.isEmpty) {
-        _controller.queryAll();
-      }
-      _showToast(appLocalizations.operation_completed);
+      _showToast(appLocalizations.toast_permission);
+      await _setAppPermission();
       return;
     }
     if (status.isPermanentlyDenied) {
@@ -489,6 +494,7 @@ class _SmsHomePageState extends State<SmsHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 系统 UI 一次性配置：原先放在 build 里，每次重建都会触发
     // platform channel 调用。透明导航栏 + edge-to-edge 由系统自动
     // 处理图标对比度，无需按主题逐帧更新。
@@ -496,6 +502,15 @@ class _SmsHomePageState extends State<SmsHomePage> {
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(systemNavigationBarColor: Colors.transparent),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 从系统设置（改默认短信/权限）返回后自动重查。掉默认短信角色时系统可能
+    // 杀进程，冷启动会走 didChangeDependencies；进程仍在时靠这里刷新。
+    if (state == AppLifecycleState.resumed && _didInitQuery) {
+      _controller.queryAll();
+    }
   }
 
   @override
@@ -520,6 +535,7 @@ class _SmsHomePageState extends State<SmsHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _focusNode.dispose();
     _controller.dispose();
     super.dispose();

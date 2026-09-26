@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:sms_advanced/sms_advanced.dart';
 
 import '../l10n/generated/app_localizations.dart';
@@ -134,28 +133,43 @@ class SmsListController extends ChangeNotifier {
     return queryAll();
   }
 
-  /// 所有查询的统一执行入口：权限、加载态、异常兜底、过滤链、并发序号、
+  /// 所有查询的统一执行入口：加载态、异常兜底、过滤链、并发序号、
   /// 整表替换都在这里，三条查询路径不再各写一套样板。
+  ///
+  /// 不再以 `Permission.sms.isGranted` 作为查询门闩：部分 ROM 在交还默认
+  /// 短信角色后会把该状态误报为拒绝，但 READ_SMS 仍然可用——此时若直接
+  /// 跳过查询，用户会看到"有权限却读不到短信"。改为先查，按异常类型提示。
   Future<void> _run(Future<List<SmsMessage>> Function() query) async {
     final int token = ++_queryToken;
     List<SmsMessage> result = <SmsMessage>[];
-    if (await Permission.sms.isGranted) {
-      loading.value = true;
-      try {
-        result = _applyFilters(await query());
-      } catch (e) {
-        // 平台查询失败（如底层插件异常）时兜底：提示失败、清空列表，
-        // 保证 loading 一定复位、界面不挂死。
-        debugPrint('querySms failed: $e');
-        result = <SmsMessage>[];
-        _notify(l10n.operation_failed);
-      } finally {
-        loading.value = false;
-      }
-    } else {
+    bool notifiedPermission = false;
+    bool querySucceeded = false;
+    loading.value = true;
+    try {
+      result = _applyFilters(await query());
+      querySucceeded = true;
+    } on SmsQueryPermissionException {
       result = <SmsMessage>[];
+      notifiedPermission = true;
       _notify(l10n.toast_permission);
+    } catch (e) {
+      // 平台查询失败（如底层插件异常）时兜底：提示失败、清空列表，
+      // 保证 loading 一定复位、界面不挂死。
+      debugPrint('querySms failed: $e');
+      result = <SmsMessage>[];
+      _notify(l10n.operation_failed);
+    } finally {
       loading.value = false;
+    }
+    // 仅在「查询成功但为空」时再判权限：失败路径已提示过，不重复弹。
+    // 用原生 checkSelfPermission，不用 Permission.sms.isGranted
+    // （掉默认后可能缓存假 true）。
+    if (querySucceeded && !notifiedPermission && result.isEmpty) {
+      final bool reallyGranted = await _repository.hasReadSmsPermission();
+      final bool? isDefault = await _repository.isDefaultSmsApp();
+      if (!reallyGranted && isDefault != true) {
+        _notify(l10n.toast_permission);
+      }
     }
     _replaceAll(result, token);
   }

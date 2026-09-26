@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sms/services/sms_repository.dart';
+import 'package:sms_advanced/sms_advanced.dart';
 
 /// sms_advanced 的查询通道（JSON 编解码）。
 const MethodChannel queryChannel = MethodChannel(
@@ -22,10 +23,19 @@ void main() {
             calls.add(call.method);
             return <dynamic>[];
           });
-      addTearDown(
-        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(queryChannel, null),
-      );
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            if (call.method == 'querySms') {
+              throw MissingPluginException('querySms');
+            }
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(queryChannel, null);
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(appChannel, null);
+      });
 
       await SmsRepository().queryByAddress('10086');
 
@@ -35,6 +45,130 @@ void main() {
         calls,
         unorderedEquals(<String>['getInbox', 'getSent', 'getDraft']),
       );
+    });
+
+    test('原生 querySms 可用时不再走插件', () async {
+      final List<String> pluginCalls = <String>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(queryChannel, (MethodCall call) async {
+            pluginCalls.add(call.method);
+            return <dynamic>[];
+          });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            if (call.method != 'querySms') return null;
+            expect(call.arguments, <String, dynamic>{'address': '10086'});
+            return <String, dynamic>{
+              'messages': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  '_id': 1,
+                  'thread_id': 1,
+                  'address': '10086',
+                  'body': 'hi',
+                  'date': 1789000000000,
+                  'type': 1,
+                },
+              ],
+              'error': null,
+            };
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(queryChannel, null);
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(appChannel, null);
+      });
+
+      final List<SmsMessage> messages = await SmsRepository().queryByAddress(
+        '10086',
+      );
+
+      expect(messages, hasLength(1));
+      expect(messages.single.body, 'hi');
+      expect(messages.single.kind, SmsMessageKind.Received);
+      expect(pluginCalls, isEmpty);
+    });
+
+    test('原生 querySms 报 permission 时抛 SmsQueryPermissionException', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            return <String, dynamic>{
+              'messages': <dynamic>[],
+              'error': 'permission',
+            };
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(appChannel, null),
+      );
+
+      await expectLater(
+        SmsRepository().getAllSms(),
+        throwsA(isA<SmsQueryPermissionException>()),
+      );
+    });
+
+    test('date 为 null 的行不会让整次查询崩溃', () async {
+      // 回归：SmsMessage.fromJson 对 containsKey('date') 且值为 null 会
+      // DateTime.fromMillisecondsSinceEpoch(null) 抛错；原生侧空列就是 null。
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            return <String, dynamic>{
+              'messages': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  '_id': 9,
+                  'thread_id': 1,
+                  'address': '10086',
+                  'body': 'draft-like',
+                  'date': null,
+                  'date_sent': null,
+                  'read': 0,
+                  'type': 3,
+                },
+              ],
+              'error': null,
+            };
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(appChannel, null),
+      );
+
+      final List<SmsMessage> messages = await SmsRepository().getAllSms();
+
+      expect(messages, hasLength(1));
+      expect(messages.single.date, isNull);
+      expect(messages.single.kind, SmsMessageKind.Draft);
+    });
+  });
+
+  group('hasReadSmsPermission', () {
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, null);
+    });
+
+    test('原生返回 true 时为 true', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            expect(call.method, 'hasReadSmsPermission');
+            return true;
+          });
+      expect(await SmsRepository().hasReadSmsPermission(), true);
+    });
+
+    test('原生返回 false 时为 false', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(appChannel, (MethodCall call) async {
+            return false;
+          });
+      expect(await SmsRepository().hasReadSmsPermission(), false);
+    });
+
+    test('通道缺失时为 false（宁可提示去授权，不误报已有权限）', () async {
+      // 回归：掉默认短信后 permission_handler 可能缓存 isGranted=true，
+      // 必须以原生 checkSelfPermission 为准，否则申请入口被短路成假成功。
+      expect(await SmsRepository().hasReadSmsPermission(), false);
     });
   });
 
